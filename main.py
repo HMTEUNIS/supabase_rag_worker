@@ -5,6 +5,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 from models.request import InterpretRequest, InterpretResponse
 from rag.config import load_global_settings, load_project_config
@@ -55,17 +56,19 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/rag/interpret", response_model=InterpretResponse)
-def interpret(
+async def interpret(
     body: InterpretRequest,
     authorization: Annotated[str | None, Header()] = None,
 ) -> InterpretResponse:
     require_auth(body.project_id, authorization)
     try:
-        return process_interpretation(body)
+        # `process_interpretation` is synchronous (Supabase + OpenAI clients),
+        # so run it in a worker thread to avoid blocking the event loop.
+        return await run_in_threadpool(process_interpretation, body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception("interpret failed")
         raise HTTPException(status_code=500, detail="Internal error") from e

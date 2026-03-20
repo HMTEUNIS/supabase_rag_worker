@@ -72,6 +72,9 @@ class GlobalSettings:
     llm_provider: str
     llm_model: str
     llm_temperature: float
+    gemini_api_key: str | None
+    gemini_llm_model: str
+    gemini_llm_temperature: float
     openai_api_key: str | None
     deepseek_api_key: str | None
     deepseek_base_url: str
@@ -103,12 +106,18 @@ def load_global_settings() -> GlobalSettings:
         supabase_url=url,
         supabase_service_key=key,
         worker_api_key=os.getenv("WORKER_API_KEY", "").strip() or None,
-        embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai").strip().lower(),
-        embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small").strip(),
+        embedding_provider=os.getenv("EMBEDDING_PROVIDER", "gemini").strip().lower(),
+        embedding_model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-001").strip(),
         embedding_dimension=embedding_dimension,
-        llm_provider=os.getenv("LLM_PROVIDER", "deepseek").strip().lower(),
-        llm_model=os.getenv("LLM_MODEL", "deepseek-chat").strip(),
+        llm_provider=os.getenv("LLM_PROVIDER", "gemini").strip().lower(),
+        llm_model=os.getenv("LLM_MODEL", "gemini-3.1-flash-lite-preview").strip(),
         llm_temperature=llm_temperature,
+        gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip() or None,
+        gemini_llm_model=os.getenv("GEMINI_LLM_MODEL", "gemini-3.1-flash-lite-preview").strip(),
+        gemini_llm_temperature=float(
+            os.getenv("GEMINI_LLM_TEMPERATURE", "").strip()
+            or os.getenv("LLM_TEMPERATURE", "0.2").strip()
+        ),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip() or None,
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", "").strip() or None,
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip().rstrip("/"),

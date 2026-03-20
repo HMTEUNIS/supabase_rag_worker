@@ -1,16 +1,16 @@
 # Supabase RAG Worker
 
-Config-driven **Retrieval-Augmented Generation** service: **FastAPI** + **Supabase (PostgREST + pgvector)** + pluggable **chat** providers (DeepSeek / OpenAI-compatible). Embeddings are implemented via **OpenAI** in this repo; swap `rag/embeddings.py` if you want another embedding backend.
+Config-driven **Retrieval-Augmented Generation** service: **FastAPI** + **Supabase (PostgREST + pgvector)** + pluggable **chat** providers (Gemini by default; optional OpenAI/DeepSeek fallbacks). Embeddings are implemented via **Gemini** in this repo; see `rag/embeddings.py` / `rag/gemini_client.py`.
 
 The worker stays **domain-agnostic**: callers supply `project_id`, `task`, `text`, optional `metadata`, `docs_filters`, and `instructions`. Nothing in the code assumes pharmacies, tickets, or a specific CRM.
 
 ## How it works
 
 1. Resolve **tenant config** from env vars: `{PREFIX}_VECTOR_RPC`, optional persistence tables, defaults.
-2. **Embed** the query text (OpenAI by default); optional `EMBEDDING_DIMENSION` check.
+2. **Embed** the query text (Gemini by default); optional `EMBEDDING_DIMENSION` check/truncation for pgvector compatibility.
 3. Call your Postgres **RPC** (e.g. `match_documents`) with the embedding + filters — this is how pgvector search is exposed through Supabase.
 4. **Build** a prompt from retrieved snippets + instructions + metadata.
-5. **Complete** with `LLM_PROVIDER` (DeepSeek or OpenAI), with automatic fallback when both keys exist.
+5. **Complete** with `LLM_PROVIDER` (Gemini), with optional fallback when other provider keys are configured.
 6. Optionally **persist** success rows / **failure** rows to tenant tables.
 
 ```mermaid
@@ -29,8 +29,8 @@ flowchart LR
 |------|------|
 | `main.py` | FastAPI app, auth, `/api/rag/interpret` |
 | `rag/config.py` | Global + per-project env loading; `project_id` → uppercase prefix |
-| `rag/embeddings.py` | `generate_embedding` (OpenAI) |
-| `rag/llm.py` | DeepSeek / OpenAI chat + fallback |
+| `rag/embeddings.py` | `generate_embedding` (Gemini/OpenAI providers) |
+| `rag/llm.py` | Gemini + optional DeepSeek/OpenAI chat fallback |
 | `rag/prompts.py` | Prompt assembly |
 | `rag/retrieve.py` | `supabase.rpc(...)` wrapper + filter forwarding |
 | `rag/service.py` | Orchestration + persistence hooks |
@@ -47,17 +47,20 @@ flowchart LR
 | `SUPABASE_URL` | yes | Supabase project URL |
 | `SUPABASE_SERVICE_KEY` | yes | Service role key (server only — never in browsers) |
 | `WORKER_API_KEY` | no | If set, all requests must send `Authorization: Bearer <token>` |
-| `EMBEDDING_PROVIDER` | no | `openai` (default). Extend code for others. |
-| `EMBEDDING_MODEL` | no | Default `text-embedding-3-small` |
+| `EMBEDDING_PROVIDER` | no | `gemini` (default). Supported: `gemini`, `openai` |
+| `EMBEDDING_MODEL` | no | Default `gemini-embedding-001` |
+| `GEMINI_API_KEY` | yes* | *Required when using Gemini embeddings |
 | `OPENAI_API_KEY` | yes* | *Required when using OpenAI embeddings |
 | `EMBEDDING_DIMENSION` | no | If set, embedding length must match (catches model/table mismatch early) |
-| `LLM_PROVIDER` | no | `deepseek` (default) or `openai` |
-| `LLM_MODEL` | no | Primary chat model for the chosen provider |
+| `LLM_PROVIDER` | no | `gemini` (default); optional: `openai`, `deepseek` |
+| `LLM_MODEL` | no | Primary chat model env (Gemini uses `GEMINI_LLM_MODEL`) |
 | `LLM_TEMPERATURE` | no | Default `0.2` |
-| `DEEPSEEK_API_KEY` | no | DeepSeek (OpenAI-compatible) API key |
+| `GEMINI_LLM_MODEL` | no | Default `gemini-3.1-flash-lite-preview` |
+| `GEMINI_LLM_TEMPERATURE` | no | Default `0.2` |
+| `DEEPSEEK_API_KEY` | no | DeepSeek (OpenAI-compatible) API key (optional fallback) |
 | `DEEPSEEK_BASE_URL` | no | Default `https://api.deepseek.com` |
-| `OPENAI_LLM_MODEL` | no | Used when DeepSeek is primary and OpenAI is fallback (default `gpt-4o-mini`) |
-| `DEEPSEEK_LLM_MODEL` | no | Used when OpenAI is primary and DeepSeek is fallback (default `deepseek-chat`) |
+| `OPENAI_LLM_MODEL` | no | Used as OpenAI fallback when applicable (default `gpt-4o-mini`) |
+| `DEEPSEEK_LLM_MODEL` | no | Used as DeepSeek fallback when applicable (default `deepseek-chat`) |
 | `LOG_PII` | no | `true` to log prompt bodies (dev only) |
 | `LOG_LEVEL` | no | e.g. `INFO`, `DEBUG` |
 

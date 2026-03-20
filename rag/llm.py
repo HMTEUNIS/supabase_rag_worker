@@ -4,6 +4,7 @@ from typing import Protocol
 from openai import OpenAI
 
 from rag.config import GlobalSettings
+from rag.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,27 @@ def call_llm_with_fallback(system: str, user: str, settings: GlobalSettings) -> 
     Order: LLM_PROVIDER primary, then OpenAI if configured and different.
     """
     errors: list[str] = []
+
+    def try_gemini() -> tuple[str, str] | None:
+        if not settings.gemini_api_key:
+            return None
+        try:
+            client = GeminiClient(
+                settings.gemini_api_key,
+                embedding_model=settings.embedding_model,
+                embedding_dimension=settings.embedding_dimension,
+            )
+            text = client.generate_chat(
+                system,
+                user,
+                model=settings.gemini_llm_model,
+                temperature=settings.gemini_llm_temperature,
+            )
+            return text, f"gemini:{settings.gemini_llm_model}"
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"gemini: {e}")
+            logger.warning("Gemini call failed: %s", e)
+            return None
 
     def try_deepseek() -> tuple[str, str] | None:
         if not settings.deepseek_api_key:
@@ -74,7 +96,17 @@ def call_llm_with_fallback(system: str, user: str, settings: GlobalSettings) -> 
             return None
 
     primary = settings.llm_provider
-    if primary == "deepseek":
+    if primary == "gemini":
+        out = try_gemini()
+        if out:
+            return out
+        out = try_openai()
+        if out:
+            return out
+        out = try_deepseek()
+        if out:
+            return out
+    elif primary == "deepseek":
         out = try_deepseek()
         if out:
             return out
