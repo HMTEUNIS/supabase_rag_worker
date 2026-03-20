@@ -34,3 +34,32 @@ class InterpretResponse(BaseModel):
     processing_time_ms: int
     external_ref: dict[str, Any] = Field(default_factory=dict)
     model: str | None = None
+
+
+class BackfillEmbeddingsRequest(BaseModel):
+    """
+    Admin operation: populate pgvector embeddings for rows where embedding IS NULL.
+
+    This is domain-agnostic: table + column names can come from tenant env config or request overrides.
+    """
+
+    project_id: str
+    limit: int = Field(default=100, ge=1, le=10000, description="Max rows to backfill.")
+    batch_size: int = Field(default=50, ge=1, le=500, description="Rows per Supabase batch.")
+    sleep_seconds: float = Field(default=0.0, ge=0.0, le=10.0, description="Optional throttle between batches.")
+    dry_run: bool = Field(default=False, description="If true, computes embeddings but does not persist them.")
+
+    # Optional overrides for non-standard schemas.
+    table: str | None = None
+    content_column: str | None = None
+    embedding_column: str | None = None
+
+
+class BackfillEmbeddingsResponse(BaseModel):
+    updated: int
+    candidates_checked: int
+    table: str
+    content_column: str
+    embedding_column: str
+    dry_run: bool
+    processing_time_ms: int

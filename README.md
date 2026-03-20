@@ -166,6 +166,59 @@ cp .env.example .env
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## One-time: backfill embeddings
+Your `match_documents` RPC queries `public.knowledge_base.embedding`. If that column is `NULL`, retrieval will return no matches.
+
+You can backfill embeddings in two ways:
+
+1. A standalone script (one-time / offline)
+2. An admin HTTP endpoint (incremental; call it whenever you add new rows)
+
+### Script
+To backfill embeddings for rows where `embedding IS NULL`:
+
+```bash
+. .venv/bin/activate
+export SUPABASE_URL=...
+export SUPABASE_SERVICE_KEY=...
+export EMBEDDING_PROVIDER=gemini
+export EMBEDDING_MODEL=gemini-embedding-001
+export EMBEDDING_DIMENSION=1536
+
+python scripts/backfill_embeddings.py
+```
+
+Optional env vars:
+- `EMBEDDINGS_TABLE` (default `knowledge_base`)
+- `EMBEDDINGS_CONTENT_COLUMN` (default `content`)
+- `EMBEDDINGS_EMBEDDING_COLUMN` (default `embedding`)
+- `EMBEDDINGS_BACKFILL_BATCH_SIZE` (default `50`)
+- `EMBEDDINGS_SLEEP_SECONDS` (default `0.0`)
+
+### Admin endpoint (recommended)
+`POST /api/ops/backfill-embeddings`
+
+This endpoint computes embeddings for rows where `embedding_column IS NULL` and writes them back. It is incremental: once a row has an embedding, it is skipped.
+
+Request body:
+
+```json
+{
+  "project_id": "greatrx",
+  "limit": 100,
+  "batch_size": 50,
+  "sleep_seconds": 0.0,
+  "dry_run": false,
+  "table": "knowledge_base",
+  "content_column": "content",
+  "embedding_column": "embedding"
+}
+```
+
+Notes:
+- `table` / `content_column` / `embedding_column` are optional; if omitted, the worker uses tenant env config (`{PREFIX}_DOCS_TABLE`, `{PREFIX}_DOCS_CONTENT_COLUMN`, `{PREFIX}_DOCS_EMBEDDING_COLUMN`) and otherwise defaults to `knowledge_base` / `content` / `embedding`.
+- The endpoint uses the same embedding provider/model as `/api/rag/interpret` (your Gemini settings, in Gemini-only mode).
+
 With [Railway CLI](https://docs.railway.app/develop/cli) linked to a project:
 
 ```bash

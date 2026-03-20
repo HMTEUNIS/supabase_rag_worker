@@ -7,9 +7,15 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from models.request import InterpretRequest, InterpretResponse
+from models.request import (
+    InterpretRequest,
+    InterpretResponse,
+    BackfillEmbeddingsRequest,
+    BackfillEmbeddingsResponse,
+)
 from rag.config import load_global_settings, load_project_config
 from rag.service import process_interpretation
+from rag.ops_backfill_embeddings import backfill_embeddings
 
 load_dotenv()
 
@@ -71,4 +77,19 @@ async def interpret(
         raise HTTPException(status_code=502, detail=str(e)) from e
     except Exception as e:
         logger.exception("interpret failed")
+        raise HTTPException(status_code=500, detail="Internal error") from e
+
+
+@app.post("/api/ops/backfill-embeddings", response_model=BackfillEmbeddingsResponse)
+async def ops_backfill_embeddings(
+    body: BackfillEmbeddingsRequest,
+    authorization: Annotated[str | None, Header()] = None,
+) -> BackfillEmbeddingsResponse:
+    require_auth(body.project_id, authorization)
+    try:
+        return await run_in_threadpool(backfill_embeddings, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        logger.exception("backfill failed")
         raise HTTPException(status_code=500, detail="Internal error") from e
