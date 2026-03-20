@@ -24,9 +24,16 @@ def query_similar_docs(
     params: dict[str, Any] = {
         "p_query_embedding": embedding,
         "p_match_count": match_count,
-        "p_category": docs_filters.get("category"),
-        "p_tags": docs_filters.get("tags"),
     }
+
+    # Only pass optional params when present. This makes the worker compatible with
+    # RPCs that don't define category/tags parameters at all.
+    category = docs_filters.get("category")
+    tags = docs_filters.get("tags")
+    if category is not None:
+        params["p_category"] = category
+    if tags is not None:
+        params["p_tags"] = tags
 
     for k, v in docs_filters.items():
         if k in ("category", "tags"):
