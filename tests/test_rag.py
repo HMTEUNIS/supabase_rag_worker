@@ -18,6 +18,7 @@ def env_greatrx(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EMBEDDING_DIMENSION", "1536")
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("LLM_MODEL", "gpt-test")
+    monkeypatch.delenv("GREATRX_MATCH_THRESHOLD", raising=False)
 
 
 def test_normalize_prefix() -> None:
@@ -87,5 +88,7 @@ def test_process_interpretation_mocked(env_greatrx: None, monkeypatch: pytest.Mo
 
     mock_sb.rpc.assert_called_once()
     call_kw = mock_sb.rpc.call_args[0][1]
-    assert call_kw["p_category"] == "pharmacy_playbook"
-    assert call_kw["p_tags"] == ["shortage"]
+    assert call_kw["filter_category"] == "pharmacy_playbook"
+    assert call_kw["filter_tags"] == ["shortage"]
+    assert call_kw["match_count"] == 5
+    assert call_kw["match_threshold"] == 0.0

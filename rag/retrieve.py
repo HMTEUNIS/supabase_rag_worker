@@ -18,28 +18,33 @@ def query_similar_docs(
     """
     Calls project-configured PostgREST RPC. Params must match your SQL function signature.
     Convention (see sql/example_match_documents.sql):
-      p_query_embedding, p_match_count, p_category, p_tags
-    Extra keys in docs_filters are passed through as p_<key> if your RPC accepts them.
+      query_embedding, match_count, match_threshold, filter_category, filter_tags
+    Extra keys in docs_filters are passed through only if your RPC accepts them.
     """
     params: dict[str, Any] = {
-        "p_query_embedding": embedding,
-        "p_match_count": match_count,
+        "query_embedding": embedding,
+        "match_count": match_count,
     }
 
-    # Only pass optional params when present. This makes the worker compatible with
-    # RPCs that don't define category/tags parameters at all.
+    # PostgREST matches functions by parameter names/types. Your RPC signature includes
+    # `match_threshold`, so always send it (defaulting to 0.0 if unset).
+    params["match_threshold"] = project.match_threshold if project.match_threshold is not None else 0.0
+
+    # Optional filters: only include when present so it can match RPC defaults.
     category = docs_filters.get("category")
     tags = docs_filters.get("tags")
     if category is not None:
-        params["p_category"] = category
+        params["filter_category"] = category
     if tags is not None:
-        params["p_tags"] = tags
+        params["filter_tags"] = tags
 
+    # Pass through any additional filter keys verbatim. If the RPC doesn't accept them,
+    # PostgREST will throw an error with a helpful signature hint.
     for k, v in docs_filters.items():
         if k in ("category", "tags"):
             continue
-        pk = k if k.startswith("p_") else f"p_{k}"
-        params[pk] = v
+        if k not in params:
+            params[k] = v
 
     try:
         res = supabase.rpc(project.vector_rpc, params).execute()

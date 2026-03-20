@@ -17,10 +17,11 @@ create extension if not exists vector;
 -- create index on public.your_docs using ivfflat (embedding vector_cosine_ops);
 
 create or replace function public.match_documents(
-  p_query_embedding vector(1536),
-  p_match_count int default 5,
-  p_category text default null,
-  p_tags text[] default null
+  query_embedding vector(1536),
+  match_count int default 5,
+  match_threshold double precision default 0.0,
+  filter_category text default null,
+  filter_tags text[] default null
 )
 returns table (
   id bigint,
@@ -36,10 +37,11 @@ as $$
     (1 - (d.embedding <=> p_query_embedding))::double precision as similarity
   from public.your_docs d
   where
-    (p_category is null or d.category = p_category)
-    and (p_tags is null or d.tags && p_tags)
-  order by d.embedding <=> p_query_embedding
-  limit greatest(1, least(p_match_count, 50));
+    (filter_category is null or d.category = filter_category)
+    and (filter_tags is null or d.tags && filter_tags)
+    and (1 - (d.embedding <=> query_embedding)) >= match_threshold
+  order by d.embedding <=> query_embedding
+  limit greatest(1, least(match_count, 50));
 $$;
 
 grant execute on function public.match_documents(vector, int, text, text[]) to service_role;

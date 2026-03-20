@@ -93,8 +93,12 @@ def process_interpretation(
         "docs_filters": req.docs_filters,
     }
 
+    stage = "pipeline"
     try:
+        stage = "embedding"
         emb = generate_embedding(req.data.text, settings)
+
+        stage = "retrieve"
         rows = query_similar_docs(
             supabase,
             project,
@@ -102,6 +106,8 @@ def process_interpretation(
             req.match_count,
             req.docs_filters,
         )
+
+        stage = "prompt"
         instructions = (req.instructions or project.default_instructions or "").strip()
         system, user = build_prompt(
             query_text=req.data.text,
@@ -110,8 +116,16 @@ def process_interpretation(
             metadata=req.data.metadata,
             task=req.task,
         )
+
+        stage = "llm"
         interpretation, model_used = call_llm_with_fallback(system, user, settings)
-        _log_llm_io(settings=settings, system=system, user=user, assistant=interpretation, model=model_used)
+        _log_llm_io(
+            settings=settings,
+            system=system,
+            user=user,
+            assistant=interpretation,
+            model=model_used,
+        )
 
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         docs_used = _docs_used_ids(rows)
@@ -120,6 +134,8 @@ def process_interpretation(
         external_blob = req.data.model_dump()
         external_blob.pop("text", None)
         external_ref: dict[str, Any] = external_blob
+
+        stage = "persist"
         row = {
             "task": req.task,
             "external_ref": external_ref,
@@ -152,15 +168,25 @@ def process_interpretation(
             model=model_used,
         )
 
+    except ValueError as e:
+        # Configuration / provider issues.
+        try:
+            _insert_failed_run(supabase, project, persist_payload, str(e), stage)
+        except Exception as log_exc:  # noqa: BLE001
+            logger.warning("Could not record failure row: %s", log_exc)
+        raise
+
+    except RuntimeError as e:
+        # Provider fallback errors, etc.
+        try:
+            _insert_failed_run(supabase, project, persist_payload, str(e), stage)
+        except Exception as log_exc:  # noqa: BLE001
+            logger.warning("Could not record failure row: %s", log_exc)
+        raise
+
     except Exception as e:  # noqa: BLE001
         try:
-            _insert_failed_run(
-                supabase,
-                project,
-                persist_payload,
-                str(e),
-                "pipeline",
-            )
+            _insert_failed_run(supabase, project, persist_payload, str(e), stage)
         except Exception as log_exc:  # noqa: BLE001
             logger.warning("Could not record pipeline failure: %s", log_exc)
-        raise
+        raise RuntimeError(f"{stage}_failed: {e}") from e

@@ -16,6 +16,7 @@ def normalize_project_prefix(project_id: str) -> str:
 class ProjectConfig:
     prefix: str
     vector_rpc: str
+    match_threshold: float | None
     interpretations_table: str | None
     failed_runs_table: str | None
     default_instructions: str
@@ -41,6 +42,12 @@ def load_project_config(project_id: str) -> ProjectConfig:
     interp = _prefixed(prefix, "INTERPRETATIONS_TABLE") or None
     failed = _prefixed(prefix, "FAILED_RUNS_TABLE") or None
     default_instructions = _prefixed(prefix, "DEFAULT_INSTRUCTIONS")
+    match_threshold_raw = _prefixed(prefix, "MATCH_THRESHOLD")
+    match_threshold: float | None
+    if match_threshold_raw:
+        match_threshold = float(match_threshold_raw)
+    else:
+        match_threshold = None
 
     docs_table = _prefixed(prefix, "DOCS_TABLE") or None
     docs_content = _prefixed(prefix, "DOCS_CONTENT_COLUMN") or None
@@ -51,6 +58,7 @@ def load_project_config(project_id: str) -> ProjectConfig:
     return ProjectConfig(
         prefix=prefix,
         vector_rpc=vector_rpc,
+        match_threshold=match_threshold,
         interpretations_table=interp,
         failed_runs_table=failed,
         default_instructions=default_instructions,
