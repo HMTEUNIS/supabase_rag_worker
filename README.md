@@ -183,7 +183,7 @@ pytest -q
 4. `runtime.txt` requests Python 3.11.x (Nixpacks/Heroku-style builders honor it; if your builder ignores it, set Python 3.11 in the platform UI).
 
 
-be sure to not be in a legacy geo
+be sure to not be in a legacy geo. if it wont change, log out and log back in
 ## Extending
 
 - **Another LLM:** add a branch in `rag/llm.py` (or small provider modules) using the same OpenAI-compatible message shape.
