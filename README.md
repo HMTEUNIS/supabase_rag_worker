@@ -18,7 +18,7 @@ flowchart LR
   Client -->|POST /api/rag/interpret| API[FastAPI]
   API --> Emb[Embeddings]
   Emb --> RPC[Supabase RPC + pgvector]
-  RPC --> LLM[Chat LLM]
+  RPC --> LLM[Chat LLM] 
   LLM --> API
   API -->|optional| DB[(interpretations / failures)]
 ```
@@ -182,6 +182,8 @@ pytest -q
 3. Railway sets `PORT`; `Procfile` uses uvicorn on `0.0.0.0`.
 4. `runtime.txt` requests Python 3.11.x (Nixpacks/Heroku-style builders honor it; if your builder ignores it, set Python 3.11 in the platform UI).
 
+
+be sure to not be in a legacy geo
 ## Extending
 
 - **Another LLM:** add a branch in `rag/llm.py` (or small provider modules) using the same OpenAI-compatible message shape.
