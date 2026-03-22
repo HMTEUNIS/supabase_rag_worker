@@ -153,7 +153,7 @@ Response:
 
 ### `POST /api/rag/run-interpret`
 
-Loads all comments for an `issue_group_id` from `public.issue_group_comments` (configurable via env), concatenates them into the query text, then runs the **same** RAG + LLM path as `/api/rag/interpret` (still uses `knowledge_base` + `match_documents` for retrieval).
+Loads all **rows** for an `issue_group_id` from a Supabase table (default `issue_group_comments` with column `body`, or point at **`tickets`** and list the text columns), concatenates them into the query text, then runs the **same** RAG + LLM path as `/api/rag/interpret` (vector RPC + retrieval).
 
 ```json
 {
@@ -170,13 +170,18 @@ Database setup (one script): `sql/issue_groups_and_interpretations.sql`.
 
 Optional env (defaults shown):
 
-| Variable | Default |
-|----------|---------|
-| `{PREFIX}_ISSUE_GROUP_COMMENTS_TABLE` | `issue_group_comments` |
-| `{PREFIX}_ISSUE_GROUP_ID_COLUMN` | `issue_group_id` |
-| `{PREFIX}_COMMENT_BODY_COLUMN` | `body` |
+| Variable | Default | Notes |
+|----------|---------|--------|
+| `{PREFIX}_ISSUE_GROUP_SOURCE_TABLE` | *(unset)* | If set, used as the table name (e.g. `tickets`). Otherwise `{PREFIX}_ISSUE_GROUP_COMMENTS_TABLE` or `issue_group_comments`. |
+| `{PREFIX}_ISSUE_GROUP_COMMENTS_TABLE` | `issue_group_comments` | Legacy override when `SOURCE_TABLE` is unset. |
+| `{PREFIX}_ISSUE_GROUP_ID_COLUMN` | `issue_group_id` | FK column on that table. |
+| `{PREFIX}_ISSUE_GROUP_ORDER_COLUMN` | `id` | `.order(..., desc=False)` when loading rows. |
+| `{PREFIX}_ISSUE_GROUP_TEXT_COLUMNS` | *(unset)* | Comma-separated columns merged per row (e.g. `title,description`). If unset, a single `{PREFIX}_COMMENT_BODY_COLUMN` (default `body`) is used. |
+| `{PREFIX}_COMMENT_BODY_COLUMN` | `body` | Single-column mode only. |
 
 Set `{PREFIX}_INTERPRETATIONS_TABLE` to a dedicated table (e.g. `interpretations`), **not** `knowledge_base`.
+
+To call several groups in sequence (e.g. 101–105) with a delay between requests for API rate/cost pacing, use `scripts/run_interpret_issue_groups.sh` and set `WORKER_BASE_URL`, optional `WORKER_API_KEY`, and optional `DELAY_SECONDS` (default `120`).
 
 ### `GET /health`
 

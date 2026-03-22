@@ -24,8 +24,11 @@ class ProjectConfig:
     docs_content_column: str | None
     docs_embedding_column: str | None
     worker_api_key: str | None
+    issue_group_source_table: str | None
     issue_group_comments_table: str | None
     issue_group_id_column: str | None
+    issue_group_order_column: str | None
+    issue_group_text_columns: tuple[str, ...] | None
     comment_body_column: str | None
 
 
@@ -58,8 +61,17 @@ def load_project_config(project_id: str) -> ProjectConfig:
 
     worker_key = _prefixed(prefix, "WORKER_API_KEY") or None
 
+    ig_source = _prefixed(prefix, "ISSUE_GROUP_SOURCE_TABLE") or None
     ig_comments = _prefixed(prefix, "ISSUE_GROUP_COMMENTS_TABLE") or None
     ig_id_col = _prefixed(prefix, "ISSUE_GROUP_ID_COLUMN") or None
+    ig_order = _prefixed(prefix, "ISSUE_GROUP_ORDER_COLUMN") or None
+    text_cols_raw = _prefixed(prefix, "ISSUE_GROUP_TEXT_COLUMNS")
+    if text_cols_raw:
+        text_cols = tuple(c.strip() for c in text_cols_raw.split(",") if c.strip())
+        if not text_cols:
+            text_cols = None
+    else:
+        text_cols = None
     comment_body = _prefixed(prefix, "COMMENT_BODY_COLUMN") or None
 
     return ProjectConfig(
@@ -73,8 +85,11 @@ def load_project_config(project_id: str) -> ProjectConfig:
         docs_content_column=docs_content,
         docs_embedding_column=docs_embedding,
         worker_api_key=worker_key,
+        issue_group_source_table=ig_source,
         issue_group_comments_table=ig_comments,
         issue_group_id_column=ig_id_col,
+        issue_group_order_column=ig_order,
+        issue_group_text_columns=text_cols,
         comment_body_column=comment_body,
     )
 

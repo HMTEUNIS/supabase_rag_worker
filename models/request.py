@@ -38,8 +38,8 @@ class InterpretResponse(BaseModel):
 
 class RunInterpretRequest(BaseModel):
     """
-    Load comments for an issue group from Supabase, concatenate them as query text,
-    then run the same RAG pipeline as /api/rag/interpret (including knowledge_base retrieval).
+    Load rows for an issue group from Supabase (e.g. tickets or comments), build query text,
+    then run the same RAG pipeline as /api/rag/interpret (including vector retrieval).
     """
 
     project_id: str
