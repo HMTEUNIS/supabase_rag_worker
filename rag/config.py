@@ -24,6 +24,9 @@ class ProjectConfig:
     docs_content_column: str | None
     docs_embedding_column: str | None
     worker_api_key: str | None
+    issue_group_comments_table: str | None
+    issue_group_id_column: str | None
+    comment_body_column: str | None
 
 
 def _prefixed(prefix: str, key: str) -> str:
@@ -55,6 +58,10 @@ def load_project_config(project_id: str) -> ProjectConfig:
 
     worker_key = _prefixed(prefix, "WORKER_API_KEY") or None
 
+    ig_comments = _prefixed(prefix, "ISSUE_GROUP_COMMENTS_TABLE") or None
+    ig_id_col = _prefixed(prefix, "ISSUE_GROUP_ID_COLUMN") or None
+    comment_body = _prefixed(prefix, "COMMENT_BODY_COLUMN") or None
+
     return ProjectConfig(
         prefix=prefix,
         vector_rpc=vector_rpc,
@@ -66,6 +73,9 @@ def load_project_config(project_id: str) -> ProjectConfig:
         docs_content_column=docs_content,
         docs_embedding_column=docs_embedding,
         worker_api_key=worker_key,
+        issue_group_comments_table=ig_comments,
+        issue_group_id_column=ig_id_col,
+        comment_body_column=comment_body,
     )
 
 

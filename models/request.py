@@ -36,6 +36,20 @@ class InterpretResponse(BaseModel):
     model: str | None = None
 
 
+class RunInterpretRequest(BaseModel):
+    """
+    Load comments for an issue group from Supabase, concatenate them as query text,
+    then run the same RAG pipeline as /api/rag/interpret (including knowledge_base retrieval).
+    """
+
+    project_id: str
+    issue_group_id: int
+    task: str = Field(default="interpret_issue_group")
+    instructions: str | None = None
+    docs_filters: dict[str, Any] = Field(default_factory=dict)
+    match_count: int = Field(default=5, ge=1, le=50)
+
+
 class BackfillEmbeddingsRequest(BaseModel):
     """
     Admin operation: populate pgvector embeddings for rows where embedding IS NULL.

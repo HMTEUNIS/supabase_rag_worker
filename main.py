@@ -7,13 +7,17 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
+from supabase import create_client
+
 from models.request import (
     InterpretRequest,
     InterpretResponse,
+    RunInterpretRequest,
     BackfillEmbeddingsRequest,
     BackfillEmbeddingsResponse,
 )
 from rag.config import load_global_settings, load_project_config
+from rag.run_issue_group import build_run_interpret_request
 from rag.service import process_interpretation
 from rag.ops_backfill_embeddings import backfill_embeddings
 
@@ -77,6 +81,40 @@ async def interpret(
         raise HTTPException(status_code=502, detail=str(e)) from e
     except Exception as e:
         logger.exception("interpret failed")
+        raise HTTPException(status_code=500, detail="Internal error") from e
+
+
+@app.post("/api/rag/run-interpret", response_model=InterpretResponse)
+async def run_interpret(
+    body: RunInterpretRequest,
+    authorization: Annotated[str | None, Header()] = None,
+) -> InterpretResponse:
+    require_auth(body.project_id, authorization)
+
+    def _job() -> InterpretResponse:
+        settings = load_global_settings()
+        project = load_project_config(body.project_id)
+        supabase = create_client(settings.supabase_url, settings.supabase_service_key)
+        inner = build_run_interpret_request(
+            project_id=body.project_id,
+            issue_group_id=body.issue_group_id,
+            task=body.task,
+            instructions=body.instructions,
+            docs_filters=body.docs_filters,
+            match_count=body.match_count,
+            supabase=supabase,
+            project=project,
+        )
+        return process_interpretation(inner, settings=settings, supabase=supabase)
+
+    try:
+        return await run_in_threadpool(_job)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("run_interpret failed")
         raise HTTPException(status_code=500, detail="Internal error") from e
 
 

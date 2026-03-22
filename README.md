@@ -151,6 +151,33 @@ Response:
 
 `confidence` is derived from the maximum `similarity` value returned by your RPC when present; otherwise `null`.
 
+### `POST /api/rag/run-interpret`
+
+Loads all comments for an `issue_group_id` from `public.issue_group_comments` (configurable via env), concatenates them into the query text, then runs the **same** RAG + LLM path as `/api/rag/interpret` (still uses `knowledge_base` + `match_documents` for retrieval).
+
+```json
+{
+  "project_id": "greatrx",
+  "issue_group_id": 101,
+  "task": "interpret_issue_group",
+  "instructions": null,
+  "docs_filters": { "category": "playbook", "tags": ["shortage"] },
+  "match_count": 5
+}
+```
+
+Database setup (one script): `sql/issue_groups_and_interpretations.sql`.
+
+Optional env (defaults shown):
+
+| Variable | Default |
+|----------|---------|
+| `{PREFIX}_ISSUE_GROUP_COMMENTS_TABLE` | `issue_group_comments` |
+| `{PREFIX}_ISSUE_GROUP_ID_COLUMN` | `issue_group_id` |
+| `{PREFIX}_COMMENT_BODY_COLUMN` | `body` |
+
+Set `{PREFIX}_INTERPRETATIONS_TABLE` to a dedicated table (e.g. `interpretations`), **not** `knowledge_base`.
+
 ### `GET /health`
 
 Returns `{ "status": "ok" }`.
